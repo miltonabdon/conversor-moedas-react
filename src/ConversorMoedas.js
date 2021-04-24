@@ -12,14 +12,20 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faAngleDoubleRight } from "@fortawesome/free-solid-svg-icons";
 import ListarMoedas from "./Listar-Moedas";
+import axios from "axios";
 
 function ConversorMoedas() {
+  const FIXER_URL =
+    "http://data.fixer.io/api/latest?access_key=3d1efa4250ee3b6f42455fe37063d046";
+
   const [valor, setValor] = useState("1");
   const [moedaDe, setMoedaDe] = useState("BRL");
   const [moedaPara, setMoedaPara] = useState("USD");
   const [exibirSpinner, setExibirSpinner] = useState(false);
-  const [formValidado, setFormValidado] = useState(false)
-  
+  const [formValidado, setFormValidado] = useState(false);
+  const [exibirModal, setExibirModal] = useState(false);
+  const [resultadoConversao, setResultadoConversao] = useState("");
+  const [exibirMsgErro, setExibirMsgErro] = useState(false);
 
   function handleValor(event) {
     setValor(event.target.value.replace(/\D/g, ""));
@@ -32,18 +38,62 @@ function ConversorMoedas() {
     setMoedaPara(event.target.value);
   }
 
-  function converter(event){
-      event.preventDefault()
-      setFormValidado(true)
-      if(event.currentTarget.checkValidity() == true){
-        
-      }
+  function handleFecharModal(event) {
+    setValor("1");
+    setMoedaDe("BRL");
+    setMoedaPara("USD");
+    setFormValidado(false);
+    setExibirModal(false);
+  }
+
+  function converter(event) {
+    event.preventDefault();
+    setFormValidado(true);
+    if (event.currentTarget.checkValidity() == true) {
+      setExibirSpinner(true);
+      axios
+        .get(FIXER_URL)
+        .then((res) => {
+          const cotacao = obterCotacao(res.data);
+          if (cotacao) {
+            setResultadoConversao(
+              `${valor} ${moedaDe} = ${cotacao} ${moedaPara}`
+            );
+            setExibirModal(true);
+            setExibirSpinner(false);
+            setExibirMsgErro(false);
+          } else {
+            exibirErro();
+          }
+        })
+        .catch((err) => {
+          exibirErro();
+          console.log(err);
+        });
+    }
+  }
+
+  function obterCotacao(dadosCotacao) {
+    if (!dadosCotacao || dadosCotacao.success !== true) {
+      return false;
+    }
+
+    const cotacaoDe = dadosCotacao.rates[moedaDe];
+    const cotacaoPara = dadosCotacao.rates[moedaPara];
+    const cotacao = (1 / cotacaoDe) * cotacaoPara * valor;
+
+    return cotacao.toFixed(2);
+  }
+
+  function exibirErro() {
+    setExibirMsgErro(true);
+    setExibirSpinner(false);
   }
 
   return (
     <div>
       <h1>Conversor de Moedas</h1>
-      <Alert variant="danger" show={false}>
+      <Alert variant="danger" show={exibirMsgErro}>
         Erro obtendo dados de conversão, tente novamente
       </Alert>
       <Jumbotron>
@@ -90,13 +140,15 @@ function ConversorMoedas() {
             </Col>
           </Form.Row>
         </Form>
-        <Modal show={false}>
+        <Modal show={exibirModal} onHide={handleFecharModal}>
           <Modal.Header closeButton>
             <Modal.Title>Conversão</Modal.Title>
           </Modal.Header>
-          <Modal.Body>Resultado da conversão aqui...</Modal.Body>
+          <Modal.Body>{resultadoConversao}</Modal.Body>
           <Modal.Footer>
-            <Button variant="success">Nova Conversão</Button>
+            <Button variant="success" onClick={handleFecharModal}>
+              Nova Conversão
+            </Button>
           </Modal.Footer>
         </Modal>
       </Jumbotron>
